@@ -826,7 +826,7 @@ export default CoinDropApp;Preleva USDT</h2>
   };
 
   const ReferralPage = () => {
-    const referralLink = `https://t.me/YOUR_BOT_USERNAME?start=${currentUser.referralCode}`;
+    const referralLink = `https://t.me/@Testhusdhe_bot?start=${currentUser.referralCode}`;
 
     return (
       <div className="p-6 space-y-6">
