@@ -5,6 +5,8 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
   const [adController, setAdController] = useState(null);
   const [loading, setLoading] = useState(false);
   const [widgetId, setWidgetId] = useState(null);
+  const [status, setStatus] = useState('Inizializzazione...');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (userId) {
@@ -14,23 +16,21 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
 
   const initAd = async () => {
     try {
-      console.log('🔄 Inizializzazione Tads Ad per userId:', userId);
+      setStatus('Caricamento configurazione...');
       
       // Carica configurazione provider da Supabase
-      const { data: provider } = await supabase
+      const { data: provider, error: dbError } = await supabase
         .from('ad_providers')
         .select('config')
         .eq('name', 'Tads')
         .eq('enabled', true)
         .single();
 
-      if (!provider) {
-        console.error('❌ Tads provider non trovato nel database');
-        if (onError) onError('Provider non disponibile');
+      if (dbError || !provider) {
+        setError('Provider non trovato');
+        setStatus('Errore: Provider non disponibile');
         return;
       }
-
-      console.log('✅ Provider trovato:', provider);
 
       const config = provider.config;
       const wId = type === 'rewarded' 
@@ -38,105 +38,116 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
         : config.static_widget_id;
 
       if (!wId) {
-        console.error('❌ Widget ID non configurato per tipo:', type);
-        if (onError) onError('Widget non configurato');
+        setError('Widget ID mancante');
+        setStatus('Errore: Widget non configurato');
         return;
       }
 
-      console.log(`✅ Widget ID: ${wId} (tipo: ${type})`);
       setWidgetId(wId);
+      setStatus('Widget ID trovato: ' + wId);
 
       // Attendi che window.tads sia pronto
-      if (!window.tads) {
-        console.warn('⏳ Tads SDK non ancora caricato, riprovo...');
-        setTimeout(() => initAd(), 100);
-        return;
-      }
+      let attempts = 0;
+      const waitForTads = setInterval(() => {
+        attempts++;
+        if (window.tads) {
+          clearInterval(waitForTads);
+          setStatus('Tads SDK caricato');
+          
+          // Inizializza il tipo corretto
+          if (type === 'rewarded') {
+            initRewardedAd(wId);
+          } else {
+            initStaticAd(wId);
+          }
+        } else if (attempts > 50) {
+          clearInterval(waitForTads);
+          setError('SDK non caricato');
+          setStatus('Errore: Tads SDK non disponibile');
+        }
+      }, 100);
 
-      console.log('✅ Tads SDK pronto');
-
-      // Inizializza il tipo corretto
-      if (type === 'rewarded') {
-        console.log('🎬 Inizializzazione rewarded ad...');
-        initRewardedAd(wId);
-      } else {
-        console.log('📺 Inizializzazione static ad...');
-        initStaticAd(wId);
-      }
     } catch (err) {
-      console.error('❌ Errore inizializzazione ad:', err);
-      if (onError) onError(err);
+      setError(err.message);
+      setStatus('Errore: ' + err.message);
     }
   };
 
   const initRewardedAd = (wId) => {
-    const controller = window.tads.init({
-      widgetId: wId,
-      type: 'fullscreen',
-      debug: false,
-      onShowReward: (result) => {
-        console.log('✅ Annuncio completato:', result);
-        // Mostra feedback ma NON aggiunge monete (lo fa il webhook)
-        if (onReward) {
-          onReward('Complimenti! Il tuo saldo verrà aggiornato tra qualche secondo.');
+    try {
+      const controller = window.tads.init({
+        widgetId: wId,
+        type: 'fullscreen',
+        debug: false,
+        onShowReward: (result) => {
+          setStatus('Annuncio completato! ✅');
+          if (onReward) {
+            onReward('Ricompensa in arrivo tra qualche secondo!');
+          }
+        },
+        onClickReward: (adId) => {
+          // Solo log
+        },
+        onAdsNotFound: () => {
+          setStatus('Nessun annuncio disponibile ⚠️');
+          setError('No ads');
         }
-      },
-      onClickReward: (adId) => {
-        console.log('👆 Click annuncio:', adId);
-        // Solo log, niente monete
-      },
-      onAdsNotFound: () => {
-        console.log('❌ Nessun annuncio disponibile');
-        if (onError) {
-          onError('Nessun annuncio disponibile al momento');
-        }
-      }
-    });
-    setAdController(controller);
+      });
+      setAdController(controller);
+      setStatus('Pronto! Clicca il pulsante');
+      setError(null);
+    } catch (err) {
+      setError('Errore init: ' + err.message);
+      setStatus('Errore inizializzazione');
+    }
   };
 
   const initStaticAd = (wId) => {
-    const controller = window.tads.init({
-      widgetId: wId,
-      type: 'static',
-      debug: false,
-      onClickReward: (adId) => {
-        console.log('👆 Banner cliccato (UI feedback):', adId);
-        // NON dare monete, solo log
-      },
-      onAdsNotFound: () => {
-        console.log('❌ Nessun banner disponibile');
-      }
-    });
-
-    // Carica automaticamente per static ads
-    controller.loadAd()
-      .then(() => controller.showAd())
-      .catch((err) => {
-        console.error('Errore caricamento banner:', err);
+    try {
+      const controller = window.tads.init({
+        widgetId: wId,
+        type: 'static',
+        debug: false,
+        onClickReward: (adId) => {
+          // Solo log
+        },
+        onAdsNotFound: () => {
+          setStatus('Nessun banner');
+        }
       });
 
-    setAdController(controller);
+      controller.loadAd()
+        .then(() => {
+          controller.showAd();
+          setStatus('Banner caricato');
+        })
+        .catch((err) => {
+          setError('Load failed: ' + err.message);
+        });
+
+      setAdController(controller);
+    } catch (err) {
+      setError('Errore static: ' + err.message);
+    }
   };
 
   const showAd = async () => {
     if (!adController) {
-      console.error('❌ Controller non pronto');
-      if (onError) onError('Controller non inizializzato');
+      setError('Controller non pronto');
+      alert('Annuncio non ancora pronto, attendi qualche secondo');
       return;
     }
 
-    console.log('▶️ Tentativo di mostrare annuncio...');
     setLoading(true);
+    setStatus('Caricamento annuncio...');
     
     try {
       await adController.showAd();
-      console.log('✅ Annuncio mostrato con successo');
+      setStatus('Annuncio in corso...');
     } catch (err) {
-      console.error('❌ Errore mostra ad:', err);
-      if (onError) {
-        onError('Errore durante la visualizzazione dell\'annuncio');
-      }
+      setError('Show failed: ' + err.message);
+      setStatus('Errore mostra annuncio');
+      alert('Errore: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -146,23 +157,45 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
   if (type === 'static') {
     return (
       <div className="w-full">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
+            <p className="text-xs text-red-600">{error}</p>
+          </div>
+        )}
         <div 
           id={`tads-container-${widgetId}`}
           className="w-full min-h-[100px] flex items-center justify-center bg-gray-50 rounded-lg"
-        />
+        >
+          {!widgetId && <span className="text-xs text-gray-400">{status}</span>}
+        </div>
       </div>
     );
   }
 
   // Rendering per tipo rewarded
   return (
-    <button
-      onClick={showAd}
-      disabled={loading || !adController}
-      className="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg py-3 font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      {loading ? 'Caricamento...' : '📺 Guarda Annuncio (+10 CDC)'}
-    </button>
+    <div className="w-full">
+      {/* Status indicator */}
+      <div className="mb-2 text-xs text-gray-500 text-center">
+        {status}
+      </div>
+      
+      {/* Error indicator */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-2 mb-2">
+          <p className="text-xs text-red-600 text-center">{error}</p>
+        </div>
+      )}
+      
+      {/* Button */}
+      <button
+        onClick={showAd}
+        disabled={loading || !adController}
+        className="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg py-3 font-bold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Caricamento...' : !adController ? 'Preparazione...' : '📺 Guarda Annuncio (+10 CDC)'}
+      </button>
+    </div>
   );
 };
 
