@@ -64,13 +64,18 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
       widgetId: wId,
       type: 'fullscreen',
       debug: false,
-      // Il webhook farà il lavoro principale, questi sono solo per feedback UI
+      // I callback sono SOLO per feedback UI, NON danno monete!
+      // Le monete vengono aggiunte dal webhook server-side
       onShowReward: (result) => {
         console.log('🎉 Annuncio completato (UI feedback):', result);
-        // Mostra messaggio all'utente
+        // Solo messaggio all'utente
         if (onReward) {
-          onReward('Ricompensa in arrivo! Controlla il saldo tra qualche secondo.');
+          onReward('Complimenti! Il tuo saldo verrà aggiornato tra qualche secondo.');
         }
+      },
+      onClickReward: (adId) => {
+        console.log('👆 Click sull\'annuncio (UI feedback):', adId);
+        // NON dare monete, il webhook lo farà
       },
       onAdsNotFound: () => {
         console.log('❌ Nessun annuncio disponibile');
@@ -87,6 +92,7 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
       debug: false,
       onClickReward: (adId) => {
         console.log('👆 Banner cliccato (UI feedback):', adId);
+        // NON dare monete, solo log
       },
       onAdsNotFound: () => {
         console.log('❌ Nessun banner disponibile');
