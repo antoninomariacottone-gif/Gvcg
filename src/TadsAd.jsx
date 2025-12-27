@@ -14,6 +14,8 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
 
   const initAd = async () => {
     try {
+      console.log('🔄 Inizializzazione Tads Ad per userId:', userId);
+      
       // Carica configurazione provider da Supabase
       const { data: provider } = await supabase
         .from('ad_providers')
@@ -23,10 +25,12 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
         .single();
 
       if (!provider) {
-        console.error('Tads provider non trovato');
+        console.error('❌ Tads provider non trovato nel database');
         if (onError) onError('Provider non disponibile');
         return;
       }
+
+      console.log('✅ Provider trovato:', provider);
 
       const config = provider.config;
       const wId = type === 'rewarded' 
@@ -34,27 +38,33 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
         : config.static_widget_id;
 
       if (!wId) {
-        console.error('Widget ID non configurato');
+        console.error('❌ Widget ID non configurato per tipo:', type);
         if (onError) onError('Widget non configurato');
         return;
       }
 
+      console.log(`✅ Widget ID: ${wId} (tipo: ${type})`);
       setWidgetId(wId);
 
       // Attendi che window.tads sia pronto
       if (!window.tads) {
+        console.warn('⏳ Tads SDK non ancora caricato, riprovo...');
         setTimeout(() => initAd(), 100);
         return;
       }
 
+      console.log('✅ Tads SDK pronto');
+
       // Inizializza il tipo corretto
       if (type === 'rewarded') {
+        console.log('🎬 Inizializzazione rewarded ad...');
         initRewardedAd(wId);
       } else {
+        console.log('📺 Inizializzazione static ad...');
         initStaticAd(wId);
       }
     } catch (err) {
-      console.error('Errore inizializzazione ad:', err);
+      console.error('❌ Errore inizializzazione ad:', err);
       if (onError) onError(err);
     }
   };
@@ -64,22 +74,22 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
       widgetId: wId,
       type: 'fullscreen',
       debug: false,
-      // I callback sono SOLO per feedback UI, NON danno monete!
-      // Le monete vengono aggiunte dal webhook server-side
       onShowReward: (result) => {
-        console.log('🎉 Annuncio completato (UI feedback):', result);
-        // Solo messaggio all'utente
+        console.log('✅ Annuncio completato:', result);
+        // Mostra feedback ma NON aggiunge monete (lo fa il webhook)
         if (onReward) {
           onReward('Complimenti! Il tuo saldo verrà aggiornato tra qualche secondo.');
         }
       },
       onClickReward: (adId) => {
-        console.log('👆 Click sull\'annuncio (UI feedback):', adId);
-        // NON dare monete, il webhook lo farà
+        console.log('👆 Click annuncio:', adId);
+        // Solo log, niente monete
       },
       onAdsNotFound: () => {
         console.log('❌ Nessun annuncio disponibile');
-        if (onError) onError('Nessun annuncio disponibile al momento');
+        if (onError) {
+          onError('Nessun annuncio disponibile al momento');
+        }
       }
     });
     setAdController(controller);
@@ -111,16 +121,22 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
 
   const showAd = async () => {
     if (!adController) {
-      console.error('Controller non pronto');
+      console.error('❌ Controller non pronto');
+      if (onError) onError('Controller non inizializzato');
       return;
     }
 
+    console.log('▶️ Tentativo di mostrare annuncio...');
     setLoading(true);
+    
     try {
       await adController.showAd();
+      console.log('✅ Annuncio mostrato con successo');
     } catch (err) {
-      console.error('Errore mostra ad:', err);
-      if (onError) onError(err);
+      console.error('❌ Errore mostra ad:', err);
+      if (onError) {
+        onError('Errore durante la visualizzazione dell\'annuncio');
+      }
     } finally {
       setLoading(false);
     }
