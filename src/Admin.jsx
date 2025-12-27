@@ -219,7 +219,7 @@ const AdminPanel = () => {
         alert('Compila titolo e ricompensa!');
         return;
       }
-
+      
       await supabase.from('tasks').insert([{
         title: form.title,
         description: form.description,
@@ -342,6 +342,7 @@ const AdminPanel = () => {
 
   const WithdrawalsManager = () => {
     const [withdrawals, setWithdrawals] = useState([]);
+    const [search, setSearch] = useState('');
 
     useEffect(() => {
       loadWithdrawals();
@@ -354,6 +355,12 @@ const AdminPanel = () => {
         .order('date', { ascending: false });
       setWithdrawals(data || []);
     };
+
+    const filtered = withdrawals.filter(w =>
+      w.username.toLowerCase().includes(search.toLowerCase()) ||
+      w.user_id.toString().includes(search) ||
+      w.wallet_address.toLowerCase().includes(search.toLowerCase())
+    );
 
     const approveWithdrawal = async (w) => {
       await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', w.id);
@@ -382,56 +389,73 @@ const AdminPanel = () => {
     return (
       <div className="p-6">
         <h2 className="text-2xl font-bold mb-6">Gestione Prelievi</h2>
+        
+        <div className="mb-6 relative">
+          <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cerca per username, ID utente o wallet..."
+            className="w-full pl-10 pr-4 py-3 border rounded-lg"
+          />
+        </div>
+
         <div className="space-y-4">
-          {withdrawals.map(w => (
-            <div key={w.id} className="bg-white rounded-xl shadow-md p-5">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="font-bold text-lg">@{w.username}</div>
-                  <div className="text-gray-700 mt-1">
-                    <span className="font-semibold">${w.usdt_amount} USDT</span>
-                    <span className="text-gray-500 ml-2">({w.cdc_amount.toLocaleString()} CDC)</span>
+          {filtered.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">Nessun prelievo trovato</div>
+          ) : (
+            filtered.map(w => (
+              <div key={w.id} className="bg-white rounded-xl shadow-md p-5">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="font-bold text-lg">@{w.username}</div>
+                    <div className="text-sm text-gray-600">ID: {w.user_id}</div>
+                    <div className="text-gray-700 mt-1">
+                      <span className="font-semibold">${w.usdt_amount} USDT</span>
+                      <span className="text-gray-500 ml-2">({w.cdc_amount.toLocaleString()} CDC)</span>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-2 break-all">
+                      <span className="font-medium">Wallet:</span> {w.wallet_address}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2">
+                      {new Date(w.date).toLocaleString('it-IT')}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-600 mt-2 break-all">
-                    <span className="font-medium">Wallet:</span> {w.wallet_address}
+                  <div className="flex items-center gap-2 ml-4">
+                    {w.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => approveWithdrawal(w)}
+                          className="bg-green-500 text-white p-3 rounded-lg hover:bg-green-600"
+                          title="Approva"
+                        >
+                          <CheckCircle className="w-6 h-6" />
+                        </button>
+                        <button
+                          onClick={() => rejectWithdrawal(w)}
+                          className="bg-red-500 text-white p-3 rounded-lg hover:bg-red-600"
+                          title="Rifiuta"
+                        >
+                          <XCircle className="w-6 h-6" />
+                        </button>
+                      </>
+                    )}
+                    {w.status === 'approved' && (
+                      <span className="text-green-600 font-semibold flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">
+                        <CheckCircle className="w-5 h-5" /> Approvato
+                      </span>
+                    )}
+                    {w.status === 'rejected' && (
+                      <span className="text-red-600 font-semibold flex items-center gap-2 bg-red-50 px-4 py-2 rounded-lg">
+                        <XCircle className="w-5 h-5" /> Rifiutato
+                      </span>
+                    )}
                   </div>
-                  <div className="text-xs text-gray-400 mt-2">
-                    {new Date(w.date).toLocaleString('it-IT')}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 ml-4">
-                  {w.status === 'pending' && (
-                    <>
-                      <button
-                        onClick={() => approveWithdrawal(w)}
-                        className="bg-green-500 text-white p-3 rounded-lg hover:bg-green-600"
-                        title="Approva"
-                      >
-                        <CheckCircle className="w-6 h-6" />
-                      </button>
-                      <button
-                        onClick={() => rejectWithdrawal(w)}
-                        className="bg-red-500 text-white p-3 rounded-lg hover:bg-red-600"
-                        title="Rifiuta"
-                      >
-                        <XCircle className="w-6 h-6" />
-                      </button>
-                    </>
-                  )}
-                  {w.status === 'approved' && (
-                    <span className="text-green-600 font-semibold flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">
-                      <CheckCircle className="w-5 h-5" /> Approvato
-                    </span>
-                  )}
-                  {w.status === 'rejected' && (
-                    <span className="text-red-600 font-semibold flex items-center gap-2 bg-red-50 px-4 py-2 rounded-lg">
-                      <XCircle className="w-5 h-5" /> Rifiutato
-                    </span>
-                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     );
@@ -439,20 +463,30 @@ const AdminPanel = () => {
 
   const SystemSettings = () => {
     const [funds, setFunds] = useState('');
+    const [adProviders, setAdProviders] = useState([]);
+    const [newProvider, setNewProvider] = useState({ name: '', priority: '' });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-      const load = async () => {
-        const { data } = await supabase
-          .from('system')
-          .select('total_funds')
-          .eq('id', 1)
-          .single();
-        setFunds(data.total_funds.toString());
-        setLoading(false);
-      };
       load();
     }, []);
+
+    const load = async () => {
+      const { data: system } = await supabase
+        .from('system')
+        .select('total_funds')
+        .eq('id', 1)
+        .single();
+      setFunds(system.total_funds.toString());
+
+      const { data: providers } = await supabase
+        .from('ad_providers')
+        .select('*')
+        .order('priority', { ascending: true });
+      setAdProviders(providers || []);
+      
+      setLoading(false);
+    };
 
     const updateFunds = async () => {
       if (!funds || parseFloat(funds) <= 0) {
@@ -467,32 +501,179 @@ const AdminPanel = () => {
       
       alert('Fondi aggiornati con successo!');
     };
-    
+
+    const addProvider = async () => {
+      if (!newProvider.name || !newProvider.priority) {
+        alert('Compila tutti i campi!');
+        return;
+      }
+
+      await supabase
+        .from('ad_providers')
+        .insert([{
+          name: newProvider.name,
+          priority: parseInt(newProvider.priority),
+          enabled: true
+        }]);
+
+      setNewProvider({ name: '', priority: '' });
+      load();
+    };
+
+    const toggleProvider = async (provider) => {
+      await supabase
+        .from('ad_providers')
+        .update({ enabled: !provider.enabled })
+        .eq('id', provider.id);
+      load();
+    };
+
+    const updatePriority = async (id, newPriority) => {
+      await supabase
+        .from('ad_providers')
+        .update({ priority: parseInt(newPriority) })
+        .eq('id', id);
+      load();
+    };
+
+    const deleteProvider = async (id) => {
+      if (confirm('Eliminare questo provider?')) {
+        await supabase
+          .from('ad_providers')
+          .delete()
+          .eq('id', id);
+        load();
+      }
+    };
+
     if (loading) return <div className="p-6">Caricamento...</div>;
 
     return (
-      <div className="p-6">
-        <h2 className="text-2xl font-bold mb-6">Impostazioni Sistema</h2>
-        <div className="bg-white rounded-xl shadow-lg p-6 max-w-2xl">
-          <h3 className="font-bold text-lg mb-4">Fondi Totali Pool</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Modifica i fondi totali in USDT del sistema. Questo influenza il tasso di cambio CDC/USDT.
-          </p>
-          <label className="block text-sm font-semibold mb-2">Fondi Totali (USDT)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={funds}
-            onChange={(e) => setFunds(e.target.value)}
-            className="w-full border-2 rounded-lg p-3 mb-4 text-lg"
-            placeholder="10000.00"
-          />
-          <button
-            onClick={updateFunds}
-            className="w-full bg-blue-600 text-white rounded-lg py-3 font-bold hover:bg-blue-700"
-          >
-            Aggiorna Fondi
-          </button>
+      <div className="p-6 space-y-8">
+        <div>
+          <h2 className="text-2xl font-bold mb-6">Impostazioni Sistema</h2>
+          
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-2xl">
+            <h3 className="font-bold text-lg mb-4">Fondi Totali Pool</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Modifica i fondi totali in USDT del sistema. Questo influenza il tasso di cambio CDC/USDT.
+            </p>
+            <label className="block text-sm font-semibold mb-2">Fondi Totali (USDT)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={funds}
+              onChange={(e) => setFunds(e.target.value)}
+              className="w-full border-2 rounded-lg p-3 mb-4 text-lg"
+              placeholder="10000.00"
+            />
+            <button
+              onClick={updateFunds}
+              className="w-full bg-blue-600 text-white rounded-lg py-3 font-bold hover:bg-blue-700"
+            >
+              Aggiorna Fondi
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-2xl font-bold mb-6">Gestione Provider Pubblicitari</h2>
+          
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 className="font-bold text-lg mb-4">Aggiungi Nuovo Provider</h3>
+            <div className="flex gap-3 mb-4">
+              <input
+                type="text"
+                value={newProvider.name}
+                onChange={(e) => setNewProvider({...newProvider, name: e.target.value})}
+                placeholder="Nome Provider (es. AdMob)"
+                className="flex-1 border rounded-lg p-3"
+              />
+              <input
+                type="number"
+                value={newProvider.priority}
+                onChange={(e) => setNewProvider({...newProvider, priority: e.target.value})}
+                placeholder="Priorità (1=massima)"
+                className="w-32 border rounded-lg p-3"
+              />
+              <button
+                onClick={addProvider}
+                className="bg-blue-600 text-white px-6 rounded-lg hover:bg-blue-700 font-semibold"
+              >
+                Aggiungi
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              La priorità determina l'ordine di visualizzazione degli annunci. Priorità 1 = mostrato per primo.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Come funziona:</strong> Gli annunci verranno mostrati dal provider con priorità più alta (1). Se non disponibile, si passa al successivo in ordine di priorità.
+              </p>
+            </div>
+
+            {adProviders.map(provider => (
+              <div key={provider.id} className="bg-white rounded-xl shadow-md p-5">
+                <div className="flex justify-between items-center">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <div className="font-bold text-lg">{provider.name}</div>
+                      <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                        provider.enabled 
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {provider.enabled ? 'Attivo' : 'Disattivo'}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      Creato: {new Date(provider.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-semibold text-gray-700">Priorità:</label>
+                      <input
+                        type="number"
+                        value={provider.priority}
+                        onChange={(e) => updatePriority(provider.id, e.target.value)}
+                        className="w-16 border rounded-lg p-2 text-center"
+                        min="1"
+                      />
+                    </div>
+                    
+                    <button
+                      onClick={() => toggleProvider(provider)}
+                      className={`px-4 py-2 rounded-lg font-semibold ${
+                        provider.enabled
+                          ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                          : 'bg-green-100 text-green-700 hover:bg-green-200'
+                      }`}
+                    >
+                      {provider.enabled ? 'Disattiva' : 'Attiva'}
+                    </button>
+                    
+                    <button
+                      onClick={() => deleteProvider(provider.id)}
+                      className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {adProviders.length === 0 && (
+              <div className="text-center text-gray-500 py-8">
+                Nessun provider configurato. Aggiungine uno sopra!
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -575,7 +756,7 @@ const AdminPanel = () => {
           </button>
         </div>
       </div>
-
+      
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto flex overflow-x-auto">
           {[
