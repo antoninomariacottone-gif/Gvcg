@@ -580,17 +580,6 @@ const CoinDropApp = () => {
           <div className="text-sm opacity-90">≈ ${(currentUser.balance * rate).toFixed(2)} USDT</div>
         </div>
 
-        {/* BANNER PUBBLICITARIO CASUALE */}
-        <div className="bg-white rounded-xl shadow-lg p-4">
-          <div className="text-xs text-gray-400 mb-2 text-center">Pubblicità</div>
-          <TadsAd 
-            type="static" 
-            userId={currentUser.id}
-            onReward={() => {}}
-            onError={() => {}}
-          />
-        </div>
-
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex items-center gap-3 mb-4">
             <Zap className="w-6 h-6 text-yellow-500" />
@@ -639,9 +628,11 @@ const CoinDropApp = () => {
     }, []);
 
     const handleAdReward = (message) => {
-      // Mostra solo messaggio di conferma
-      alert(message || t.rewardPending);
-      // NON aggiungere monete qui! Le aggiunge il webhook
+      alert(t.rewardPending);
+      // Ricarica il saldo dopo 3 secondi per vedere l'aggiornamento dal webhook
+      setTimeout(() => {
+        initApp();
+      }, 3000);
     };
 
     return (
@@ -907,8 +898,8 @@ const CoinDropApp = () => {
         </div>
       </div>
     );
-                }
-  
+  }
+
   // REFERRAL INPUT
   if (showReferralInput) {
     return (
