@@ -44,7 +44,7 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
       }
 
       setWidgetId(wId);
-      setStatus('Widget ID trovato: ' + wId);
+      setStatus(`Widget trovato: ${wId.substring(0, 8)}...`);
 
       // Attendi che window.tads sia pronto
       let attempts = 0;
@@ -52,7 +52,7 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
         attempts++;
         if (window.tads) {
           clearInterval(waitForTads);
-          setStatus('Tads SDK caricato');
+          setStatus('SDK pronto');
           
           // Inizializza il tipo corretto
           if (type === 'rewarded') {
@@ -62,8 +62,8 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
           }
         } else if (attempts > 50) {
           clearInterval(waitForTads);
-          setError('SDK non caricato');
-          setStatus('Errore: Tads SDK non disponibile');
+          setError('SDK timeout');
+          setStatus('Errore: SDK non caricato dopo 5 sec');
         }
       }, 100);
 
@@ -131,7 +131,7 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
     }
   };
 
-  const showAd = async () => {
+  const showAd = () => {
     if (!adController) {
       setError('Controller non pronto');
       alert('Annuncio non ancora pronto, attendi qualche secondo');
@@ -139,16 +139,17 @@ const TadsAd = ({ type = 'rewarded', userId, onReward, onError }) => {
     }
 
     setLoading(true);
-    setStatus('Caricamento annuncio...');
+    setStatus('Apertura annuncio...');
     
     try {
-      await adController.showAd();
-      setStatus('Annuncio in corso...');
+      // Tads showAd() NON è asincrono, chiamalo direttamente
+      adController.showAd();
+      setStatus('Annuncio aperto');
+      setLoading(false);
     } catch (err) {
-      setError('Show failed: ' + err.message);
-      setStatus('Errore mostra annuncio');
-      alert('Errore: ' + err.message);
-    } finally {
+      setError('Show error: ' + (err?.message || 'Unknown'));
+      setStatus('Errore apertura annuncio');
+      alert('Errore: ' + (err?.message || 'Sconosciuto'));
       setLoading(false);
     }
   };
